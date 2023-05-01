@@ -6,25 +6,17 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_validate, cross_val_predict
 from sklearn.pipeline import Pipeline
 
+from notebooks.selection import get_balanced_dataset
 
-training = pd.read_csv("dataset/training.csv")
-y_train = training[["IsBadBuy"]]
-training.drop(columns="IsBadBuy", inplace=True)
 
-training = training.dropna()
-y_train = y_train.iloc[training.index, :]
+xtrain, xtest, ytrain, ytest = get_balanced_dataset('dataset/training.csv')
 
 """
-5-fold CV, dropping NAs with select continuous features
-Mean accuracy: 0.96
-Mean AUC: 0.66
+subset of continuous features gives slightly higher accuracy and AUC
+Mean accuracy for 5-fold CV: 0.626 -- much worse than unbalanced which is expected
+Mean AUC for 5-fold CV: 0.68 -- slightly better than with unbalanced dataset
 """
 continuous_feats = ['VehicleAge', 'VehOdo', 'MMRAcquisitionAuctionAveragePrice']
-# continuous_feats = ['VehicleAge', 'VehOdo',
-#        'MMRAcquisitionAuctionAveragePrice', 'MMRAcquisitionAuctionCleanPrice',
-#        'MMRAcquisitionRetailAveragePrice', 'MMRAcquisitonRetailCleanPrice',
-#        'MMRCurrentAuctionAveragePrice', 'MMRCurrentAuctionCleanPrice',
-#        'MMRCurrentRetailAveragePrice', 'MMRCurrentRetailCleanPrice', 'VehBCost', 'WarrantyCost']
 
 cont_transformer = Pipeline([
     ("scaler", StandardScaler())
@@ -39,8 +31,7 @@ clf = Pipeline([
     ("classifier", GaussianNB())
 ])
 
-
-results = cross_validate(clf, training[continuous_feats], y_train['IsBadBuy'], scoring=['accuracy', 'balanced_accuracy', 'roc_auc'])
+results = cross_validate(clf, xtrain[continuous_feats], ytrain['IsBadBuy'], scoring=['accuracy', 'balanced_accuracy', 'roc_auc'])
 mean_accuracy = np.array(results['test_accuracy']).mean()
 mean_balanced_accuracy = np.array(results['test_balanced_accuracy']).mean()
 mean_auc = np.array(results['test_roc_auc']).mean()
@@ -51,15 +42,15 @@ print("Mean AUC ", mean_auc)
 from sklearn.metrics import RocCurveDisplay
 import matplotlib.pyplot as plt
 
-clf.fit(training[continuous_feats], y_train['IsBadBuy'])
-plot = RocCurveDisplay.from_estimator(clf, training[continuous_feats], y_train['IsBadBuy'])
+clf.fit(xtrain[continuous_feats], ytrain['IsBadBuy'])
+plot = RocCurveDisplay.from_estimator(clf, xtrain[continuous_feats], ytrain['IsBadBuy'])
 plt.show()
 #%%
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
 
-y_pred = cross_val_predict(clf, X=training, y=y_train['IsBadBuy'])
-mat = confusion_matrix(y_pred, y_train['IsBadBuy'])
+y_pred = cross_val_predict(clf, X=xtrain, y=ytrain['IsBadBuy'])
+mat = confusion_matrix(y_pred, ytrain['IsBadBuy'])
 cm_display = ConfusionMatrixDisplay(mat).plot(cmap='binary')
 
 
